@@ -11,7 +11,8 @@ import {
   Zap,
   Clock,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Repeat
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Battery, TelemetryReading } from '@/types';
