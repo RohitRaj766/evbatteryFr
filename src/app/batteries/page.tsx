@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   BatteryCharging,
@@ -41,7 +41,8 @@ export default function BatteriesPage() {
   const loadBatteries = async () => {
     setLoading(true);
     try {
-      const res = await api.batteries.list({ healthState: statusFilter || undefined, search: search || undefined });
+      // Fetch without search param — filtering is done client-side for real-time UX
+      const res = await api.batteries.list({ healthState: statusFilter || undefined });
       if (res.success) {
         setBatteries(res.data || []);
       }
@@ -51,6 +52,15 @@ export default function BatteriesPage() {
       setLoading(false);
     }
   };
+
+  // Client-side filtering: real-time prefix search + healthState combined
+  const filteredBatteries = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return batteries.filter((b) => {
+      const matchesSearch = term === '' || b.serialNumber.toLowerCase().includes(term);
+      return matchesSearch;
+    });
+  }, [batteries, search]);
 
   useEffect(() => {
     loadBatteries();
@@ -123,7 +133,6 @@ export default function BatteriesPage() {
             placeholder="Search by serial number or model..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && loadBatteries()}
             className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
           />
         </div>
@@ -148,8 +157,10 @@ export default function BatteriesPage() {
       <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
         {loading ? (
           <div className="py-12 text-center text-xs text-slate-500">Loading battery fleet...</div>
-        ) : batteries.length === 0 ? (
-          <div className="py-12 text-center text-xs text-slate-500">No batteries found.</div>
+        ) : filteredBatteries.length === 0 ? (
+          <div className="py-12 text-center text-xs text-slate-500">
+            {search.trim() ? `No batteries matching "${search.trim()}"` : 'No batteries found.'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -165,7 +176,7 @@ export default function BatteriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-medium">
-                {batteries.map((b) => (
+                {filteredBatteries.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-200">{b.serialNumber}</td>
                     <td className="py-3.5 px-4 text-slate-300">{b.modelName} ({b.capacityKwh} kWh)</td>
