@@ -61,33 +61,29 @@ apiClient.interceptors.response.use(
 // ─── API Methods ─────────────────────────────────────────────────────────────
 
 export const api = {
-  // Health
   getHealth: async () => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
-    const res = await axios.get(`${backendUrl}/health`);
+    const res = await axios.get('/health');
     return res.data;
   },
 
   // Auth
   auth: {
-    register: async (data: any): Promise<AuthResponse> => {
+    register: async (data: { email: string; password: string; name: string; role?: string }): Promise<AuthResponse> => {
       const res = await apiClient.post('/auth/register', data);
       const payload = res.data?.data || res.data;
       return {
         success: res.data?.success ?? true,
         message: res.data?.message,
-        user: payload?.user,
-        accessToken: payload?.accessToken,
+        data: payload
       };
     },
-    login: async (data: any): Promise<AuthResponse> => {
+    login: async (data: { email: string; password: string }): Promise<AuthResponse> => {
       const res = await apiClient.post('/auth/login', data);
       const payload = res.data?.data || res.data;
       return {
         success: res.data?.success ?? true,
         message: res.data?.message,
-        user: payload?.user,
-        accessToken: payload?.accessToken,
+        data: payload
       };
     },
     logout: async () => {
@@ -123,7 +119,7 @@ export const api = {
 
   // Batteries
   batteries: {
-    list: async (params?: { status?: string; healthStatus?: string; search?: string }): Promise<{ success: boolean; data: Battery[] }> => {
+    list: async (params?: { healthState?: string; search?: string; page?: number; limit?: number }): Promise<{ success: boolean; data: Battery[] }> => {
       const res = await apiClient.get('/batteries', { params });
       return res.data;
     },
@@ -131,12 +127,12 @@ export const api = {
       const res = await apiClient.get(`/batteries/${id}`);
       return res.data;
     },
-    create: async (data: { serialNumber: string; model: string; capacityKwh: number; sohPercentage?: number }): Promise<{ success: boolean; data: Battery }> => {
+    create: async (data: { serialNumber: string; manufacturer: string; modelName: string; capacityKwh: number; soh?: number; manufacturedAt: string; notes?: string }): Promise<{ success: boolean; data: Battery }> => {
       const res = await apiClient.post('/batteries', data);
       return res.data;
     },
-    decommission: async (id: string, reason: string): Promise<{ success: boolean; data: Battery }> => {
-      const res = await apiClient.patch(`/batteries/${id}/decommission`, { reason });
+    decommission: async (id: string, notes: string): Promise<{ success: boolean; data: Battery }> => {
+      const res = await apiClient.patch(`/batteries/${id}/decommission`, { notes });
       return res.data;
     },
   },
@@ -155,12 +151,12 @@ export const api = {
       const res = await apiClient.get(`/stations/${id}`);
       return res.data;
     },
-    create: async (data: { name: string; location: string; latitude: number; longitude: number; totalDocks: number }): Promise<{ success: boolean; data: Station }> => {
+    create: async (data: { name: string; location: string; latitude: number; longitude: number }): Promise<{ success: boolean; data: Station }> => {
       const res = await apiClient.post('/stations', data);
       return res.data;
     },
-    addDock: async (stationId: string, dockNumber: number): Promise<{ success: boolean; data: any }> => {
-      const res = await apiClient.post(`/stations/${stationId}/docks`, { dockNumber });
+    addDock: async (stationId: string, dockNumbers: number[]): Promise<{ success: boolean; data: any }> => {
+      const res = await apiClient.post(`/stations/${stationId}/docks`, { dockNumbers });
       return res.data;
     },
     recommendSwap: async (stationId: string): Promise<{ success: boolean; data: { recommendedBattery: Battery; dockId: string } }> => {
@@ -238,17 +234,17 @@ export const api = {
 
   // Swaps
   swaps: {
-    list: async (params?: { stationId?: string; driverId?: string }): Promise<{ success: boolean; data: Swap[] }> => {
+    list: async (params?: { stationId?: string; driverPhone?: string; page?: number; limit?: number }): Promise<{ success: boolean; data: Swap[] }> => {
       const res = await apiClient.get('/swaps', { params });
       return res.data;
     },
-    create: async (data: { driverId: string; stationId: string; oldBatteryId: string; newBatteryId: string; driverVehicleId: string; driverPhone?: string }): Promise<{ success: boolean; data: Swap }> => {
+    create: async (data: { driverPhone: string; stationId: string; batteryInId?: string | null; batteryOutId: string; driverVehicleId?: string | null }): Promise<{ success: boolean; data: Swap }> => {
       const payload = {
         stationId: data.stationId,
-        batteryOutId: data.newBatteryId,
-        batteryInId: data.oldBatteryId,
+        batteryOutId: data.batteryOutId,
+        batteryInId: data.batteryInId || null,
         driverVehicleId: data.driverVehicleId,
-        driverPhone: data.driverPhone || 'N/A',
+        driverPhone: data.driverPhone,
       };
       const res = await apiClient.post('/swaps', payload);
       return res.data;
@@ -261,7 +257,7 @@ export const api = {
       const res = await apiClient.get('/operators');
       return res.data;
     },
-    create: async (data: { userId: string; operatorCode: string }): Promise<{ success: boolean; data: Operator }> => {
+    create: async (data: { name: string; email: string; phone?: string }): Promise<{ success: boolean; data: Operator }> => {
       const res = await apiClient.post('/operators', data);
       return res.data;
     },

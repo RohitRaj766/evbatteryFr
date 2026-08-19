@@ -23,8 +23,8 @@ export default function LoginPage() {
 
     try {
       const res = await api.auth.login({ email, password });
-      if (res.success && res.accessToken && res.user) {
-        login(res.accessToken, res.user);
+      if (res.success && res.data?.accessToken && res.data?.user) {
+        login(res.data.accessToken, res.data.user);
         router.push('/');
       } else {
         setError(res.message || 'Login failed');

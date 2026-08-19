@@ -16,7 +16,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { Battery, BatteryStatus, HealthStatus } from '@/types';
+import { Battery, BatteryHealthState } from '@/types';
 import { ThermalBadge } from '@/components/ThermalBadge';
 import { useAuth } from '@/context/AuthContext';
 
@@ -29,8 +29,10 @@ export default function BatteriesPage() {
 
   // Form state
   const [serialNumber, setSerialNumber] = useState('');
-  const [model, setModel] = useState('NMC-48V-60Ah');
-  const [capacityKwh, setCapacityKwh] = useState(2.88);
+  const [manufacturer, setManufacturer] = useState('Amara Raja Energy');
+  const [modelName, setModelName] = useState('AR-48V-30AH-LFP');
+  const [capacityKwh, setCapacityKwh] = useState(1.44);
+  const [manufacturedAt, setManufacturedAt] = useState(new Date().toISOString().split('T')[0]);
   const [creating, setCreating] = useState(false);
 
   const { hasRole } = useAuth();
@@ -39,7 +41,7 @@ export default function BatteriesPage() {
   const loadBatteries = async () => {
     setLoading(true);
     try {
-      const res = await api.batteries.list({ status: statusFilter || undefined, search: search || undefined });
+      const res = await api.batteries.list({ healthState: statusFilter || undefined, search: search || undefined });
       if (res.success) {
         setBatteries(res.data || []);
       }
@@ -58,7 +60,13 @@ export default function BatteriesPage() {
     e.preventDefault();
     setCreating(true);
     try {
-      const res = await api.batteries.create({ serialNumber, model, capacityKwh: Number(capacityKwh) });
+      const res = await api.batteries.create({
+        serialNumber,
+        manufacturer,
+        modelName,
+        capacityKwh: Number(capacityKwh),
+        manufacturedAt: new Date(manufacturedAt).toISOString(),
+      });
       if (res.success) {
         setShowCreateModal(false);
         setSerialNumber('');
@@ -127,11 +135,10 @@ export default function BatteriesPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
           >
-            <option value="">All Statuses</option>
-            <option value="READY">READY</option>
-            <option value="CHARGING">CHARGING</option>
-            <option value="IN_USE">IN_USE</option>
-            <option value="MAINTENANCE">MAINTENANCE</option>
+            <option value="">All Health States</option>
+            <option value="HEALTHY">HEALTHY</option>
+            <option value="DEGRADED">DEGRADED</option>
+            <option value="CRITICAL">CRITICAL</option>
             <option value="DECOMMISSIONED">DECOMMISSIONED</option>
           </select>
         </div>
@@ -150,10 +157,10 @@ export default function BatteriesPage() {
                 <tr>
                   <th className="py-3.5 px-4">Serial Number</th>
                   <th className="py-3.5 px-4">Model</th>
-                  <th className="py-3.5 px-4">SOC / SOH</th>
+                  <th className="py-3.5 px-4">SOH / Cycles</th>
                   <th className="py-3.5 px-4">Cycles</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4">Health</th>
+                  <th className="py-3.5 px-4">Health State</th>
+                  <th className="py-3.5 px-4">Location</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -161,40 +168,36 @@ export default function BatteriesPage() {
                 {batteries.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-200">{b.serialNumber}</td>
-                    <td className="py-3.5 px-4 text-slate-300">{b.model} ({b.capacityKwh} kWh)</td>
+                    <td className="py-3.5 px-4 text-slate-300">{b.modelName} ({b.capacityKwh} kWh)</td>
                     <td className="py-3.5 px-4">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-slate-400">SOC:</span>
+                          <span className="text-[10px] text-slate-400">SOH:</span>
                           <div className="w-20 bg-slate-800 rounded-full h-1.5 overflow-hidden">
                             <div
-                              className={`h-full ${b.socPercentage > 70 ? 'bg-emerald-500' : b.socPercentage > 30 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                              style={{ width: `${b.socPercentage}%` }}
+                              className={`h-full ${b.soh > 85 ? 'bg-emerald-500' : b.soh > 75 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                              style={{ width: `${b.soh}%` }}
                             ></div>
                           </div>
-                          <span className="font-bold text-slate-200 text-[11px]">{b.socPercentage}%</span>
+                          <span className="font-bold text-slate-200 text-[11px]">{b.soh}%</span>
                         </div>
-                        <div className="text-[10px] text-slate-400">SOH: <span className="text-emerald-400 font-bold">{b.sohPercentage}%</span></div>
+                        <div className="text-[10px] text-slate-400">Cycles: <span className="text-emerald-400 font-bold">{b.cycleCount}</span></div>
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-300">{b.cycleCount}</td>
                     <td className="py-3.5 px-4">
                       <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                        b.status === 'READY' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                        b.status === 'CHARGING' ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30' :
-                        b.status === 'DECOMMISSIONED' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                        'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        b.healthState === 'HEALTHY' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                        b.healthState === 'DEGRADED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                        b.healthState === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                        'bg-slate-500/20 text-slate-400 border border-slate-500/30'
                       }`}>
-                        {b.status}
+                        {b.healthState}
                       </span>
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                        b.healthStatus === 'EXCELLENT' ? 'text-emerald-400' :
-                        b.healthStatus === 'GOOD' ? 'text-teal-400' :
-                        b.healthStatus === 'FAIR' ? 'text-amber-400' : 'text-rose-400'
-                      }`}>
-                        {b.healthStatus}
+                      <span className="text-xs text-slate-300">
+                        {b.dock ? `${b.dock.station.name} #${b.dock.dockNumber}` : 'Mobile / In Vehicle'}
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
@@ -232,26 +235,50 @@ export default function BatteriesPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Model Specification</label>
+                <label className="text-xs font-semibold text-slate-300">Manufacturer</label>
                 <input
                   type="text"
                   required
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="Amara Raja Energy"
+                  value={manufacturer}
+                  onChange={(e) => setManufacturer(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Capacity (kWh)</label>
+                <label className="text-xs font-semibold text-slate-300">Model Name</label>
                 <input
-                  type="number"
-                  step="0.1"
+                  type="text"
                   required
-                  value={capacityKwh}
-                  onChange={(e) => setCapacityKwh(Number(e.target.value))}
+                  value={modelName}
+                  onChange={(e) => setModelName(e.target.value)}
                   className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">Capacity (kWh)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={capacityKwh}
+                    onChange={(e) => setCapacityKwh(Number(e.target.value))}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-300">Manufactured Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={manufacturedAt}
+                    onChange={(e) => setManufacturedAt(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">

@@ -26,8 +26,8 @@ export default function RegisterPage() {
 
     try {
       const res = await api.auth.register({ name, email, password, role });
-      if (res.success && res.accessToken && res.user) {
-        login(res.accessToken, res.user);
+      if (res.success && res.data?.accessToken && res.data?.user) {
+        login(res.data.accessToken, res.data.user);
         router.push('/');
       } else {
         setError(res.message || 'Registration failed');

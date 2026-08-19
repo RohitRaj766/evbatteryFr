@@ -27,6 +27,7 @@ export default function SwapsPage() {
   const [oldBatteryId, setOldBatteryId] = useState('');
   const [newBatteryId, setNewBatteryId] = useState('');
   const [driverVehicleId, setDriverVehicleId] = useState('DL-01-EV-4821');
+  const [driverPhone, setDriverPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const { user } = useAuth();
@@ -42,8 +43,8 @@ export default function SwapsPage() {
       ]);
       if (swRes.success) {
         let allSwaps = swRes.data || [];
-        if (isDriver && user?.id) {
-          allSwaps = allSwaps.filter(s => s.driverId === user.id || s.driver?.email === user.email);
+        if (isDriver && user?.name) {
+          allSwaps = allSwaps.filter(s => s.operator?.name === user.name);
         }
         setSwaps(allSwaps);
       }
@@ -66,10 +67,10 @@ export default function SwapsPage() {
     setSubmitting(true);
     try {
       const res = await api.swaps.create({
-        driverId: user.id,
+        driverPhone,
         stationId,
-        oldBatteryId,
-        newBatteryId,
+        batteryInId: oldBatteryId,
+        batteryOutId: newBatteryId,
         driverVehicleId,
       });
 
@@ -129,7 +130,8 @@ export default function SwapsPage() {
                 <tr>
                   <th className="py-3.5 px-4">Time</th>
                   <th className="py-3.5 px-4">Station</th>
-                  <th className="py-3.5 px-4">Driver</th>
+                  <th className="py-3.5 px-4">Operator</th>
+                  <th className="py-3.5 px-4">Driver Phone</th>
                   <th className="py-3.5 px-4">Vehicle Plate</th>
                   <th className="py-3.5 px-4">Returned Battery</th>
                   <th className="py-3.5 px-4">Issued Battery</th>
@@ -141,22 +143,25 @@ export default function SwapsPage() {
                 {swaps.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-800/40 transition">
                     <td className="py-3.5 px-4 text-slate-400 font-mono">
-                      {new Date(s.createdAt).toLocaleString()}
+                      {new Date(s.swappedAt).toLocaleString()}
                     </td>
                     <td className="py-3.5 px-4 text-slate-200 font-semibold">
                       {s.station?.name || s.stationId}
                     </td>
                     <td className="py-3.5 px-4 text-slate-300">
-                      {s.driver?.name || s.driverId}
+                      {s.operator?.name || s.processedBy}
                     </td>
                     <td className="py-3.5 px-4 font-mono font-bold text-indigo-400">
-                      {(s as any).driverVehicleId || 'DL-01-EV-4821'}
+                      {s.driverPhone || 'N/A'}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-400">
+                      {s.driverVehicleId || 'N/A'}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-amber-400">
-                      {s.oldBattery?.serialNumber || s.oldBatteryId}
+                      {s.batteryInId || 'N/A'}
                     </td>
                     <td className="py-3.5 px-4 font-mono text-emerald-400">
-                      {s.newBattery?.serialNumber || s.newBatteryId}
+                      {s.batteryOutId}
                     </td>
                     <td className="py-3.5 px-4 font-bold text-teal-400">
                       {s.sohAtSwap}%
@@ -194,6 +199,17 @@ export default function SwapsPage() {
                 />
               </div>
               <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Driver Phone Number</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="+91 9999999999"
+                  value={driverPhone}
+                  onChange={(e) => setDriverPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
+                />
+              </div>
+              <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-300">Select Station</label>
                 <select
                   required
@@ -219,7 +235,7 @@ export default function SwapsPage() {
                   <option value="">-- Choose Old Battery --</option>
                   {batteries.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.serialNumber} (SOC: {b.socPercentage}%)
+                      {b.serialNumber} (SOH: {b.soh}%)
                     </option>
                   ))}
                 </select>
@@ -234,9 +250,9 @@ export default function SwapsPage() {
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-mono"
                 >
                   <option value="">-- Choose New Battery --</option>
-                  {batteries.filter(b => b.status === 'READY' || b.id !== oldBatteryId).map((b) => (
+                  {batteries.filter(b => b.healthState === 'HEALTHY' && b.id !== oldBatteryId).map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.serialNumber} (SOC: {b.socPercentage}%, SOH: {b.sohPercentage}%)
+                      {b.serialNumber} (SOH: {b.soh}%)
                     </option>
                   ))}
                 </select>
