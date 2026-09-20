@@ -15,6 +15,7 @@ import {
 import { api } from '@/lib/api';
 import { Station } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { Modal } from '@/components/Modal';
 
 export default function StationsPage() {
   const [stations, setStations] = useState<Station[]>([]);
@@ -189,12 +190,13 @@ export default function StationsPage() {
         </div>
       )}
 
-      {/* Create Station Modal */}
+      {/* Create Station Modal - rendered in a portal to escape backdrop-filter stacking context */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
-            <h2 className="text-lg font-bold text-white">Create Swapping Station</h2>
-            <form onSubmit={handleCreate} className="space-y-4">
+        <Modal>
+          <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-md glass-panel p-6 rounded-3xl border border-slate-800 space-y-4">
+              <h2 className="text-lg font-bold text-white">Create Swapping Station</h2>
+              <form onSubmit={handleCreate} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-300">Station Name</label>
                 <input
@@ -275,8 +277,9 @@ export default function StationsPage() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

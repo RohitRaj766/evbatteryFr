@@ -18,27 +18,29 @@ export interface AuthTokens {
 export interface AuthResponse {
   success: boolean;
   message?: string;
-  user: User;
-  accessToken: string;
-  refreshToken?: string;
+  data?: {
+    user: User;
+    accessToken: string;
+  };
 }
 
-export type BatteryStatus = 'CHARGING' | 'READY' | 'IN_USE' | 'DECOMMISSIONED' | 'MAINTENANCE';
-export type HealthStatus = 'EXCELLENT' | 'GOOD' | 'FAIR' | 'DEGRADED';
+export type BatteryHealthState = 'HEALTHY' | 'DEGRADED' | 'CRITICAL' | 'DECOMMISSIONED';
 
 export interface Battery {
   id: string;
   serialNumber: string;
-  model: string;
+  manufacturer: string;
+  modelName: string;
   capacityKwh: number;
-  sohPercentage: number;
-  socPercentage: number;
+  soh: number;
+  healthState: BatteryHealthState;
   cycleCount: number;
-  status: BatteryStatus;
-  healthStatus: HealthStatus;
-  currentStationId?: string | null;
-  currentDockId?: string | null;
-  currentDock?: {
+  manufacturedAt: string;
+  decommissionedAt?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  dock?: {
     id: string;
     dockNumber: number;
     station: {
@@ -46,20 +48,29 @@ export interface Battery {
       name: string;
     };
   } | null;
-  createdAt: string;
-  updatedAt: string;
+  _count?: {
+    swaps: number;
+    telemetry: number;
+  };
 }
 
-export type DockStatus = 'AVAILABLE' | 'OCCUPIED' | 'DISABLED';
+export type DockState = 'AVAILABLE' | 'CHARGING' | 'READY' | 'ISOLATED_CUTOFF' | 'MAINTENANCE';
 
 export interface Dock {
   id: string;
-  stationId: string;
   dockNumber: number;
-  status: DockStatus;
-  isThermalCutoff: boolean;
+  stationId: string;
+  state: DockState;
   batteryId?: string | null;
+  currentSoC: number;
+  currentSoH: number;
+  currentTemp: number;
+  lastTelemetryAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
   battery?: Battery | null;
+  station?: Station;
+  alarms?: Alarm[];
 }
 
 export interface Station {
@@ -68,82 +79,92 @@ export interface Station {
   location: string;
   latitude: number;
   longitude: number;
-  totalDocks: number;
-  availableDocks: number;
   isActive: boolean;
-  docks?: Dock[];
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    docks: number;
+    swaps: number;
+  };
+  docks?: Dock[];
 }
 
 export interface TelemetryReading {
   id: string;
   batteryId: string;
-  dockId?: string | null;
-  temperatureCelsius: number;
-  voltageVolts: number;
-  currentAmperes: number;
-  socPercentage: number;
-  sohPercentage: number;
-  timestamp: string;
+  dockId: string;
+  temperature: number;
+  voltage: number;
+  current: number;
+  soc: number;
+  soh: number;
+  createdAt: string;
 }
 
-export type AlarmLevel = 'INFO' | 'WARNING' | 'CRITICAL';
-export type AlarmStatus = 'TRIGGERED' | 'SILENCED' | 'RESOLVED';
+export type AlarmType = 'THERMAL_RUNAWAY' | 'MANUAL_CUTOFF';
+export type AlarmStatus = 'ACTIVE' | 'SILENCED' | 'RESOLVED';
 
 export interface Alarm {
   id: string;
-  batteryId: string;
-  stationId?: string | null;
-  dockId?: string | null;
-  alarmLevel: AlarmLevel;
+  dockId: string;
+  batteryId?: string | null;
+  type: AlarmType;
   status: AlarmStatus;
-  temperatureCelsius: number;
-  message: string;
+  peakTemp: number;
+  threshold: number;
+  triggeredAt: string;
   silencedAt?: string | null;
   resolvedAt?: string | null;
-  createdAt: string;
-  battery?: {
-    serialNumber: string;
-  };
-  station?: {
-    name: string;
-  };
-}
-
-export type SwapStatus = 'COMPLETED' | 'FAILED' | 'PENDING';
-
-export interface Swap {
-  id: string;
-  driverId: string;
-  stationId: string;
-  oldBatteryId: string;
-  newBatteryId: string;
-  status: SwapStatus;
-  sohAtSwap: number;
-  createdAt: string;
-  driver?: {
+  resolvedBy?: string | null;
+  notes?: string | null;
+  dock?: Dock;
+  resolver?: {
+    id: string;
     name: string;
     email: string;
   };
+}
+
+export type SwapStatus = 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+export interface Swap {
+  id: string;
+  stationId: string;
+  batteryOutId: string;
+  batteryInId?: string | null;
+  driverPhone: string;
+  driverVehicleId?: string | null;
+  status: SwapStatus;
+  socAtSwap: number;
+  sohAtSwap: number;
+  tempAtSwap: number;
+  processedBy: string;
+  swappedAt: string;
+  notes?: string | null;
   station?: {
+    id: string;
     name: string;
   };
-  oldBattery?: {
+  battery?: {
+    id: string;
     serialNumber: string;
   };
-  newBattery?: {
-    serialNumber: string;
+  operator?: {
+    id: string;
+    name: string;
   };
 }
 
 export interface Operator {
   id: string;
-  userId: string;
-  operatorCode: string;
-  assignedStationCount?: number;
-  user: User;
+  name: string;
+  email: string;
+  phone?: string | null;
+  isActive: boolean;
   createdAt: string;
+  _count?: {
+    assignments: number;
+  };
 }
 
 export interface OperatorAssignment {
@@ -159,11 +180,10 @@ export interface OperatorAssignment {
 }
 
 export interface SystemEnums {
-  userRoles: string[];
-  batteryStatuses: string[];
-  healthStatuses: string[];
-  dockStatuses: string[];
-  alarmLevels: string[];
-  alarmStatuses: string[];
-  swapStatuses: string[];
+  Role: string[];
+  DockState: string[];
+  AssignmentStatus: string[];
+  AlarmStatus: string[];
+  BatteryHealthState: string[];
+  SwapStatus: string[];
 }

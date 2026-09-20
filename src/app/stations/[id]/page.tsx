@@ -62,7 +62,7 @@ export default function StationDetailPage() {
     setActionLoading(true);
     try {
       const nextDockNumber = (station.docks?.length || 0) + 1;
-      const res = await api.stations.addDock(stationId, nextDockNumber);
+      const res = await api.stations.addDock(stationId, [nextDockNumber]);
       if (res.success) loadData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to add dock');
@@ -198,7 +198,7 @@ export default function StationDetailPage() {
             <h3 className="font-bold text-sm">Optimal Swap Recommendation Found!</h3>
           </div>
           <p className="text-xs text-slate-300">
-            Recommended Battery: <strong className="font-mono text-white">{recommendation.recommendedBattery?.serialNumber}</strong> (SOH: {recommendation.recommendedBattery?.sohPercentage}%, SOC: {recommendation.recommendedBattery?.socPercentage}%) docked at <strong className="text-emerald-400">Dock #{recommendation.dockNumber || recommendation.dockId}</strong>.
+            Recommended Battery: <strong className="font-mono text-white">{recommendation.recommendedBattery?.serialNumber}</strong> (SOH: {recommendation.recommendedBattery?.soh}%, SOC: {recommendation.recommendedBattery?.soc}%) docked at <strong className="text-emerald-400">Dock #{recommendation.dockNumber || recommendation.dockId}</strong>.
           </p>
         </div>
       )}
@@ -220,17 +220,17 @@ export default function StationDetailPage() {
               <div
                 key={dock.id}
                 className={`glass-panel p-5 rounded-2xl border flex flex-col justify-between space-y-4 ${
-                  dock.isThermalCutoff ? 'border-rose-500/50 bg-rose-950/20 pulse-critical' : 'border-slate-800'
+                  dock.state === 'ISOLATED_CUTOFF' ? 'border-rose-500/50 bg-rose-950/20 pulse-critical' : 'border-slate-800'
                 }`}
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-slate-200">Dock #{dock.dockNumber}</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      dock.isThermalCutoff ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                      dock.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                      dock.state === 'ISOLATED_CUTOFF' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                      dock.state === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
                     }`}>
-                      {dock.isThermalCutoff ? 'CUTOFF ACTIVE' : dock.status}
+                      {dock.state === 'ISOLATED_CUTOFF' ? 'CUTOFF ACTIVE' : dock.state}
                     </span>
                   </div>
 
@@ -238,11 +238,11 @@ export default function StationDetailPage() {
                     <div className="glass-card p-3 rounded-xl border border-slate-800 space-y-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-mono font-bold text-xs text-emerald-400">{dock.battery.serialNumber}</span>
-                        <span className="text-[10px] text-slate-400">{dock.battery.model}</span>
+                        <span className="text-[10px] text-slate-400">{dock.battery.modelName}</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-slate-300">
-                        <span>SOC: <strong>{dock.battery.socPercentage}%</strong></span>
-                        <span>SOH: <strong>{dock.battery.sohPercentage}%</strong></span>
+                        <span>SOC: <strong>{dock.currentSoC}%</strong></span>
+                        <span>SOH: <strong>{dock.battery.soh}%</strong></span>
                       </div>
                     </div>
                   ) : (
@@ -280,7 +280,7 @@ export default function StationDetailPage() {
                       className="w-full py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 text-[11px] font-medium border border-rose-500/30 transition flex items-center justify-center gap-1"
                     >
                       <Flame className="w-3 h-3" />
-                      <span>{dock.isThermalCutoff ? 'Reset Cutoff' : 'Thermal Cutoff'}</span>
+                      <span>{dock.state === 'ISOLATED_CUTOFF' ? 'Reset Cutoff' : 'Thermal Cutoff'}</span>
                     </button>
                   </div>
                 )}
@@ -307,7 +307,7 @@ export default function StationDetailPage() {
                   <option value="">-- Choose Battery --</option>
                   {availableBatteries.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.serialNumber} (SOC: {b.socPercentage}%, SOH: {b.sohPercentage}%)
+                      {b.serialNumber} (SOH: {b.soh}%)
                     </option>
                   ))}
                 </select>

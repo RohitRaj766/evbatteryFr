@@ -45,7 +45,7 @@ export default function BatteryDetailPage() {
       if (bRes.success) setBattery(bRes.data);
       if (tRes.success) setTelemetry(tRes.data || []);
       if (sRes.success) {
-        setBatterySwaps((sRes.data || []).filter((s: any) => s.oldBatteryId === batteryId || s.newBatteryId === batteryId));
+        setBatterySwaps((sRes.data || []).filter((s: any) => s.batteryInId === batteryId || s.batteryOutId === batteryId));
       }
     } catch (err) {
       console.error(err);
@@ -59,7 +59,7 @@ export default function BatteryDetailPage() {
   }, [batteryId]);
 
   const handleDecommission = async () => {
-    if (!decommissionReason) return alert('Please enter decommission reason');
+    if (!decommissionReason) return alert('Please enter decommission notes');
     try {
       const res = await api.batteries.decommission(batteryId, decommissionReason);
       if (res.success) {
@@ -86,7 +86,7 @@ export default function BatteryDetailPage() {
     );
   }
 
-  const latestTemp = telemetry.length > 0 ? telemetry[telemetry.length - 1].temperatureCelsius : 25;
+  const latestTemp = telemetry.length > 0 ? telemetry[telemetry.length - 1].temperature : 25;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -113,12 +113,12 @@ export default function BatteryDetailPage() {
               <ThermalBadge temperature={latestTemp} />
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Model: {battery.model} | Capacity: {battery.capacityKwh} kWh
+              Model: {battery.modelName} | Manufacturer: {battery.manufacturer} | Capacity: {battery.capacityKwh} kWh
             </p>
           </div>
         </div>
 
-        {isAdmin && battery.status !== 'DECOMMISSIONED' && (
+        {isAdmin && battery.healthState !== 'DECOMMISSIONED' && (
           <button
             onClick={() => setShowDecommission(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 text-xs font-semibold transition"
@@ -133,16 +133,17 @@ export default function BatteryDetailPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-1">
           <p className="text-xs text-slate-400 uppercase font-semibold">State of Charge (SOC)</p>
-          <p className="text-3xl font-extrabold text-slate-100">{battery.socPercentage}%</p>
+          <p className="text-3xl font-extrabold text-slate-100">—</p>
           <div className="w-full bg-slate-800 rounded-full h-2 mt-2 overflow-hidden">
-            <div className="bg-emerald-500 h-full" style={{ width: `${battery.socPercentage}%` }}></div>
+            <div className="bg-emerald-500 h-full" style={{ width: '0%' }}></div>
           </div>
+          <p className="text-[11px] text-slate-400">SOC not tracked in list API — see telemetry</p>
         </div>
 
         <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-1">
           <p className="text-xs text-slate-400 uppercase font-semibold">State of Health (SOH)</p>
-          <p className="text-3xl font-extrabold text-teal-400">{battery.sohPercentage}%</p>
-          <p className="text-[11px] text-slate-400">Degradation: {(100 - battery.sohPercentage).toFixed(1)}%</p>
+          <p className="text-3xl font-extrabold text-teal-400">{battery.soh}%</p>
+          <p className="text-[11px] text-slate-400">Degradation: {(100 - battery.soh).toFixed(1)}%</p>
         </div>
 
         <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-1">
@@ -154,10 +155,10 @@ export default function BatteryDetailPage() {
         <div className="glass-card p-5 rounded-2xl border border-slate-800 space-y-1">
           <p className="text-xs text-slate-400 uppercase font-semibold">Current Docking</p>
           <p className="text-lg font-bold text-slate-100 truncate">
-            {battery.currentDock ? `${battery.currentDock.station.name} (Dock #${battery.currentDock.dockNumber})` : 'In Vehicle / Mobile'}
+            {battery.dock ? `${battery.dock.station.name} (Dock #${battery.dock.dockNumber})` : 'In Vehicle / Mobile'}
           </p>
           <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-emerald-400 border border-slate-700">
-            {battery.status}
+            {battery.healthState}
           </span>
         </div>
       </div>
@@ -185,8 +186,8 @@ export default function BatteryDetailPage() {
                 <YAxis yAxisId="temp" orientation="left" stroke="#EF4444" domain={[20, 80]} fontSize={10} label={{ value: 'Temp (°C)', angle: -90, position: 'insideLeft', fill: '#EF4444' }} />
                 <YAxis yAxisId="volt" orientation="right" stroke="#10B981" domain={[40, 60]} fontSize={10} label={{ value: 'Voltage (V)', angle: 90, position: 'insideRight', fill: '#10B981' }} />
                 <Tooltip contentStyle={{ backgroundColor: '#131926', borderColor: '#2A364F', borderRadius: '12px', fontSize: '12px' }} />
-                <Line yAxisId="temp" type="monotone" dataKey="temperatureCelsius" stroke="#EF4444" strokeWidth={2} dot={false} name="Temperature (°C)" />
-                <Line yAxisId="volt" type="monotone" dataKey="voltageVolts" stroke="#10B981" strokeWidth={2} dot={false} name="Voltage (V)" />
+                <Line yAxisId="temp" type="monotone" dataKey="temperature" stroke="#EF4444" strokeWidth={2} dot={false} name="Temperature (°C)" />
+                <Line yAxisId="volt" type="monotone" dataKey="voltage" stroke="#10B981" strokeWidth={2} dot={false} name="Voltage (V)" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -210,24 +211,24 @@ export default function BatteryDetailPage() {
         ) : (
           <div className="space-y-3">
             {batterySwaps.map((s) => {
-              const isSwappedIn = s.newBatteryId === batteryId;
+              const isSwappedOut = s.batteryOutId === batteryId;
               return (
                 <div key={s.id} className="glass-card p-4 rounded-2xl border border-slate-800 flex items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        isSwappedIn ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        isSwappedOut ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                       }`}>
-                        {isSwappedIn ? 'ISSUED TO DRIVER' : 'RETURNED FROM DRIVER'}
+                        {isSwappedOut ? 'ISSUED TO DRIVER' : 'RETURNED FROM DRIVER'}
                       </span>
                       <span className="text-xs font-semibold text-white">{s.station?.name || 'Station'}</span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Driver: <strong className="text-slate-200">{s.driver?.name || s.driverId}</strong> | SOH at Transfer: <span className="text-emerald-400 font-bold">{s.sohAtSwap}%</span>
+                      Operator: <strong className="text-slate-200">{s.operator?.name || 'N/A'}</strong> | Phone: <strong className="text-slate-200">{s.driverPhone || 'N/A'}</strong> | SOH at Transfer: <span className="text-emerald-400 font-bold">{s.sohAtSwap}%</span>
                     </p>
                   </div>
                   <div className="text-right text-xs text-slate-500 font-mono">
-                    {new Date(s.createdAt).toLocaleString()}
+                    {new Date(s.swappedAt).toLocaleString()}
                   </div>
                 </div>
               );

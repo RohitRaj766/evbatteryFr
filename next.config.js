@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://evbattery.onrender.com';
     const apiPrefix = process.env.NEXT_PUBLIC_API_PREFIX || '/api/v1';
 
     return [
